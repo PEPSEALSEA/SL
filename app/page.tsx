@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, FormEvent, useRef } from "react";
 import { optimizedFetch, getGasEndpoint, getUploadEndpoint, invalidateCache } from "@/utils/api";
-import { buildShortUrl } from "@/utils/paths";
+import { buildShortUrl, getShortUrls } from "@/utils/paths";
 
 interface User {
   id: string;
@@ -56,6 +56,54 @@ const UploadIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
 );
 
+function ShortUrlCopies({
+  shortCode,
+  onCopy,
+  compact = false,
+}: {
+  shortCode: string;
+  onCopy: (text: string) => void;
+  compact?: boolean;
+}) {
+  const urls = getShortUrls(window.location.origin, shortCode);
+
+  if (compact) {
+    return (
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button className="button icon-only" onClick={() => onCopy(urls.fast)} title="Copy fast link">
+          <CopyIcon />
+        </button>
+        <button className="button icon-only secondary" onClick={() => onCopy(urls.legacy)} title="Copy page link">
+          <CopyIcon />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ marginTop: "16px" }}>
+        <div style={{ fontSize: "11px", fontWeight: 500, color: "var(--ink-subtle)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>
+          Fast redirect
+        </div>
+        <div className="short-url" style={{ marginTop: 0 }}>{urls.fast}</div>
+        <button type="button" className="button" style={{ marginTop: "8px" }} onClick={() => onCopy(urls.fast)}>
+          <CopyIcon /> Copy fast link
+        </button>
+      </div>
+      <div style={{ marginTop: "16px" }}>
+        <div style={{ fontSize: "11px", fontWeight: 500, color: "var(--ink-subtle)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>
+          Page link
+        </div>
+        <div className="short-url" style={{ marginTop: 0 }}>{urls.legacy}</div>
+        <button type="button" className="button secondary" style={{ marginTop: "8px" }} onClick={() => onCopy(urls.legacy)}>
+          <CopyIcon /> Copy page link
+        </button>
+      </div>
+    </>
+  );
+}
+
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
@@ -64,7 +112,7 @@ export default function Home() {
   const [loadingText, setLoadingText] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [shortUrlResult, setShortUrlResult] = useState("");
+  const [shortCodeResult, setShortCodeResult] = useState("");
   const [userLinks, setUserLinks] = useState<Link[]>([]);
   const [activeQrUrl, setActiveQrUrl] = useState<string | null>(null);
   const [createMode, setCreateMode] = useState<"url" | "file">("url");
@@ -243,7 +291,7 @@ export default function Home() {
     showLoading(true, "Processing request...");
     setError("");
     setSuccess("");
-    setShortUrlResult("");
+    setShortCodeResult("");
 
     try {
       let finalUrl = originalUrl;
@@ -302,9 +350,7 @@ export default function Home() {
       });
 
       if (data.success) {
-        const shortUrl = buildShortUrl(window.location.origin, data.shortCode);
-
-        setShortUrlResult(shortUrl);
+        setShortCodeResult(data.shortCode);
         setOriginalUrl("");
         setCustomSlug("");
         setExpiryDate("");
@@ -607,22 +653,16 @@ export default function Home() {
                     </div>
                   )}
 
-                  {shortUrlResult && (
+                  {shortCodeResult && (
                     createMode === "file" ? (
                       <div className="result-card">
                         <h3>Your File Link</h3>
-                        <div className="short-url">{shortUrlResult}</div>
-                        <button type="button" className="button" style={{ marginTop: '12px' }} onClick={() => copyToClipboard(shortUrlResult)}>
-                          <CopyIcon /> Copy Link
-                        </button>
+                        <ShortUrlCopies shortCode={shortCodeResult} onCopy={copyToClipboard} />
                       </div>
                     ) : (
                       <div className="result-card">
                         <h3>Your Short Link</h3>
-                        <div className="short-url">{shortUrlResult}</div>
-                        <button type="button" className="button" style={{ marginTop: '12px' }} onClick={() => copyToClipboard(shortUrlResult)}>
-                          <CopyIcon /> Copy to Clipboard
-                        </button>
+                        <ShortUrlCopies shortCode={shortCodeResult} onCopy={copyToClipboard} />
                       </div>
                     )
                   )}
@@ -738,7 +778,8 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {userLinks.map((link) => {
-                        const shortUrl = buildShortUrl(window.location.origin, link.shortCode);
+                        const shortUrl = buildShortUrl(link.shortCode);
+                        const urls = getShortUrls(window.location.origin, link.shortCode);
 
                         const isExpired = link.expiryDate && new Date(link.expiryDate) < new Date();
 
@@ -763,11 +804,9 @@ export default function Home() {
                             </td>
                             <td style={{ textAlign: 'center', fontWeight: '500', color: 'var(--ink-subtle)' }}>{link.clicks}</td>
                             <td>
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className="button icon-only" onClick={() => copyToClipboard(shortUrl)} title="Copy URL">
-                                  <CopyIcon />
-                                </button>
-                                <button className="button icon-only" onClick={() => setActiveQrUrl(shortUrl)} title="View QR">
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <ShortUrlCopies shortCode={link.shortCode} onCopy={copyToClipboard} compact />
+                                <button className="button icon-only" onClick={() => setActiveQrUrl(urls.fast)} title="View QR (fast link)">
                                   <QRIcon />
                                 </button>
                                 <button className="button icon-only danger" onClick={() => deleteLink(link.shortCode, link.driveId)} title="Delete Forever">

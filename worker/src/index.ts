@@ -373,7 +373,11 @@ async function handleGetUserLinks(env: Bindings, userId: string) {
   return ok('Links retrieved successfully', { links: userLinks });
 }
 
-async function handleGet(env: Bindings, shortCode: string) {
+type ResolvedLink =
+  | { ok: true; originalUrl: string; expiryDate: string; driveId: string }
+  | { ok: false; reason: 'not_found' | 'expired' };
+
+async function resolveShortCode(env: Bindings, shortCode: string): Promise<ResolvedLink> {
   const urls = await getSheetValues(env, `${URLS_SHEET}!A:G`);
 
   for (let i = 1; i < urls.length; i++) {
@@ -381,23 +385,47 @@ async function handleGet(env: Bindings, shortCode: string) {
       const currentClicks = Number(urls[i][4]) || 0;
       await updateSheetCell(env, `${URLS_SHEET}!E${i + 1}`, currentClicks + 1);
 
-      const expiryDate = urls[i][5];
+      const expiryDate = urls[i][5] || '';
       if (expiryDate) {
         const expiry = new Date(expiryDate);
         if (expiry < new Date()) {
-          return fail('Link has expired', 200, { expired: true });
+          return { ok: false, reason: 'expired' };
         }
       }
 
-      return ok('URL found', {
+      return {
+        ok: true,
         originalUrl: urls[i][1],
-        expiryDate: expiryDate || '',
+        expiryDate,
         driveId: urls[i][6] || '',
-      });
+      };
     }
   }
 
-  return fail('Short code not found');
+  return { ok: false, reason: 'not_found' };
+}
+
+function redirectDestination(link: Extract<ResolvedLink, { ok: true }>): string {
+  if (link.driveId) {
+    return `https://drive.google.com/file/d/${link.driveId}/view`;
+  }
+  return link.originalUrl;
+}
+
+async function handleGet(env: Bindings, shortCode: string) {
+  const result = await resolveShortCode(env, shortCode);
+  if (!result.ok) {
+    if (result.reason === 'expired') {
+      return fail('Link has expired', 200, { expired: true });
+    }
+    return fail('Short code not found');
+  }
+
+  return ok('URL found', {
+    originalUrl: result.originalUrl,
+    expiryDate: result.expiryDate,
+    driveId: result.driveId,
+  });
 }
 
 async function handleUpload(env: Bindings, params: Record<string, string>) {
@@ -456,6 +484,27 @@ async function handleSetup(env: Bindings) {
 // --- Routes ---
 
 app.get('/health', (c) => c.json({ ok: true, service: 'sl-worker' }));
+
+app.get('/sl/:shortCode', async (c) => {
+  try {
+    const shortCode = c.req.param('shortCode') || '';
+    if (!shortCode) {
+      return new Response('Short link not found', { status: 404 });
+    }
+
+    const result = await resolveShortCode(c.env, shortCode);
+    if (!result.ok) {
+      const message = result.reason === 'expired' ? 'Link has expired' : 'Short link not found';
+      const status = result.reason === 'expired' ? 410 : 404;
+      return new Response(message, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    }
+
+    return Response.redirect(redirectDestination(result), 302);
+  } catch (err) {
+    console.error('Redirect error:', err);
+    return new Response('Server error', { status: 500 });
+  }
+});
 
 app.get('/', async (c) => {
   try {
