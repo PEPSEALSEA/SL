@@ -11,10 +11,31 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.use('*', cors());
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+const MAX_UPLOAD_BYTES = 14 * 1024 * 1024;
+
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type'],
+  maxAge: 86400,
+}));
+
+app.onError((err, c) => {
+  console.error('Unhandled error:', err);
+  return c.json({ success: false, error: 'Server error', message: 'Server error' }, 500, CORS_HEADERS);
+});
 
 const USERS_SHEET = 'Users';
 const URLS_SHEET = 'URLs';
+
+const USERS_HEADERS = ['User ID', 'Email', 'Username', 'Real Password', 'Password Hash', 'Created At (UTC)'];
+const URLS_HEADERS = ['Short Code', 'Original URL', 'User ID', 'Created At (UTC)', 'Click Count', 'Expiry Date', 'Drive ID'];
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -46,15 +67,43 @@ async function getSheetValues(env: Bindings, range: string): Promise<string[][]>
   return data.values || [];
 }
 
+function parseCreatedTimestamp(value: string | undefined): number {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function normalizeCreatedDate(value: string | undefined): string {
+  const ts = parseCreatedTimestamp(value);
+  return ts > 0 ? new Date(ts).toISOString() : '';
+}
+
+function resolveCreatedAt(clientValue: string | undefined): string {
+  const ts = parseCreatedTimestamp(clientValue);
+  if (ts > 0) return new Date(ts).toISOString();
+  return new Date().toISOString();
+}
+
 async function appendSheetRow(env: Bindings, range: string, values: unknown[]) {
   const token = await getAuthToken(env);
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.SPREADSHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.SPREADSHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ values: [values] }),
   });
   if (!res.ok) throw new Error(`Sheets append error: ${res.statusText}`);
+}
+
+async function updateSheetRow(env: Bindings, range: string, values: unknown[]) {
+  const token = await getAuthToken(env);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [values] }),
+  });
+  if (!res.ok) throw new Error(`Sheets update row error: ${res.statusText}`);
 }
 
 async function updateSheetCell(env: Bindings, range: string, value: unknown) {
@@ -183,7 +232,7 @@ async function trashDriveFiles(env: Bindings, driveIds: string[]) {
 function jsonResponse(data: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
 
@@ -327,8 +376,10 @@ async function handleCreate(env: Bindings, params: Record<string, string>) {
     shortCode = generateShortUUID();
   }
 
+  const createdAt = resolveCreatedAt(params.createdAt);
+
   await appendSheetRow(env, URLS_SHEET, [
-    shortCode, originalUrl, userId, new Date().toISOString(), 0, expiryDate || '', driveId || '',
+    shortCode, originalUrl, userId, createdAt, 0, expiryDate || '', driveId || '',
   ]);
 
   return ok('Short URL created successfully', { shortCode, originalUrl });
@@ -361,7 +412,7 @@ async function handleGetUserLinks(env: Bindings, userId: string) {
       userLinks.push({
         shortCode: urls[i][0],
         originalUrl: urls[i][1],
-        created: urls[i][3],
+        created: normalizeCreatedDate(urls[i][3]),
         clicks: Number(urls[i][4]) || 0,
         expiryDate: urls[i][5] || '',
         driveId: urls[i][6] || '',
@@ -369,7 +420,7 @@ async function handleGetUserLinks(env: Bindings, userId: string) {
     }
   }
 
-  userLinks.sort((a, b) => new Date(String(b.created)).getTime() - new Date(String(a.created)).getTime());
+  userLinks.sort((a, b) => parseCreatedTimestamp(String(b.created)) - parseCreatedTimestamp(String(a.created)));
   return ok('Links retrieved successfully', { links: userLinks });
 }
 
@@ -466,19 +517,29 @@ async function handleDeleteFiles(env: Bindings, params: Record<string, string>) 
 }
 
 async function handleSetup(env: Bindings) {
-  const users = await getSheetValues(env, `${USERS_SHEET}!A1:F1`);
-  const urls = await getSheetValues(env, `${URLS_SHEET}!A1:G1`);
+  const users = await getSheetValues(env, `${USERS_SHEET}!A:F`);
+  const urls = await getSheetValues(env, `${URLS_SHEET}!A:G`);
 
   if (users.length === 0) {
-    await appendSheetRow(env, USERS_SHEET, ['User ID', 'Email', 'Username', 'Real Password', 'Password Hash', 'Created Date']);
+    await appendSheetRow(env, USERS_SHEET, USERS_HEADERS);
+  } else {
+    await updateSheetRow(env, `${USERS_SHEET}!A1:F1`, USERS_HEADERS);
   }
+
   if (urls.length === 0) {
-    await appendSheetRow(env, URLS_SHEET, ['Short Code', 'Original URL', 'User ID', 'Created Date', 'Click Count', 'Expiry Date', 'Drive ID']);
+    await appendSheetRow(env, URLS_SHEET, URLS_HEADERS);
+  } else {
+    await updateSheetRow(env, `${URLS_SHEET}!A1:G1`, URLS_HEADERS);
   }
 
   const usersRows = await getSheetValues(env, `${USERS_SHEET}!A:A`);
   const urlsRows = await getSheetValues(env, `${URLS_SHEET}!A:A`);
-  return ok('Sheets initialized successfully', { usersRows: usersRows.length, urlsRows: urlsRows.length });
+  return ok('Sheets initialized successfully', {
+    usersRows: usersRows.length,
+    urlsRows: urlsRows.length,
+    usersHeaders: USERS_HEADERS,
+    urlsHeaders: URLS_HEADERS,
+  });
 }
 
 // --- Routes ---
@@ -530,6 +591,13 @@ app.post('/', async (c) => {
     const url = new URL(c.req.url);
     url.searchParams.forEach((v, k) => { queryParams[k] = v; });
 
+    if (url.searchParams.get('action') === 'upload') {
+      const contentLength = Number(c.req.header('content-length') || 0);
+      if (contentLength > MAX_UPLOAD_BYTES) {
+        return fail('File too large. Maximum upload size is 10MB.');
+      }
+    }
+
     const bodyParams = await parseParams(c);
     const params = mergeQueryParams(queryParams, bodyParams);
     const action = params.action;
@@ -549,7 +617,5 @@ app.post('/', async (c) => {
     return fail('Server error', 500);
   }
 });
-
-app.options('*', () => new Response(null, { status: 204 }));
 
 export default app;

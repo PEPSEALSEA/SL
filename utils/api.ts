@@ -122,7 +122,15 @@ export async function fetchWithProgress(urlBase: string, base64Data: string, onP
         onProgress(100);
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            const text = await response.text();
+            let message = `HTTP ${response.status}`;
+            try {
+                const parsed = JSON.parse(text);
+                if (parsed.error) message = parsed.error;
+            } catch {
+                if (text) message = text.slice(0, 200);
+            }
+            throw new Error(message);
         }
 
         const data = await response.json();

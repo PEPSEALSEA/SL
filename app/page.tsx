@@ -19,6 +19,21 @@ interface Link {
   driveId?: string;
 }
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function sortLinksByCreated(links: Link[]): Link[] {
+  return [...links].sort(
+    (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+  );
+}
+
+function validateFileSize(file: File): string | null {
+  if (file.size > MAX_FILE_SIZE) {
+    return "File too large. Maximum upload size is 10MB.";
+  }
+  return null;
+}
+
 // Icons
 const CopyIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -187,7 +202,7 @@ export default function Home() {
       );
 
       if (data.success) {
-        setUserLinks(data.links || []);
+        setUserLinks(sortLinksByCreated(data.links || []));
       } else {
         setError(data.error || "Failed to load links");
       }
@@ -298,6 +313,11 @@ export default function Home() {
       let driveId = "";
 
       if (selectedFile) {
+        const sizeError = validateFileSize(selectedFile);
+        if (sizeError) {
+          throw new Error(sizeError);
+        }
+
         setLoadingText("Preparing your file...");
         setUploadProgress(0);
 
@@ -337,6 +357,7 @@ export default function Home() {
       bodyParams.append("originalUrl", finalUrl);
       bodyParams.append("customSlug", customSlug);
       bodyParams.append("userId", currentUser.id);
+      bodyParams.append("createdAt", new Date().toISOString());
       if (expiryDate) {
         // Convert local datetime to ISO string to ensure timezone consistency
         const isoDate = new Date(expiryDate).toISOString();
@@ -618,8 +639,13 @@ export default function Home() {
                           setIsDragging(false);
                           const file = e.dataTransfer.files?.[0];
                           if (file) {
+                            const sizeError = validateFileSize(file);
+                            if (sizeError) {
+                              setError(sizeError);
+                              return;
+                            }
                             setSelectedFile(file);
-                            // Sync with native file input
+                            setError("");
                             if (fileInputRef.current) {
                               const dataTransfer = new DataTransfer();
                               dataTransfer.items.add(file);
@@ -635,7 +661,20 @@ export default function Home() {
                           type="file"
                           id="fileInput"
                           ref={fileInputRef}
-                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              const sizeError = validateFileSize(file);
+                              if (sizeError) {
+                                setError(sizeError);
+                                setSelectedFile(null);
+                                e.target.value = "";
+                                return;
+                              }
+                            }
+                            setError("");
+                            setSelectedFile(file);
+                          }}
                         />
                       </div>
 
@@ -771,6 +810,7 @@ export default function Home() {
                       <tr>
                         <th>Code</th>
                         <th>Destination</th>
+                        <th>Created</th>
                         <th>Expires</th>
                         <th>Clicks</th>
                         <th>Actions</th>
@@ -798,6 +838,9 @@ export default function Home() {
                                   {link.driveId && <div style={{ color: 'var(--ink-subtle)', marginTop: '6px', fontSize: '12px' }}>Google Drive file</div>}
                                 </div>
                               </details>
+                            </td>
+                            <td style={{ fontSize: '0.9rem', color: 'var(--ink-subtle)', whiteSpace: 'nowrap' }}>
+                              {link.created ? new Date(link.created).toLocaleString() : '—'}
                             </td>
                             <td style={{ fontSize: '0.9rem', color: isExpired ? 'var(--danger)' : 'inherit' }}>
                               {link.expiryDate ? new Date(link.expiryDate).toLocaleDateString() : 'Never'}
