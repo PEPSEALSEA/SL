@@ -43,6 +43,18 @@ const LogoutIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
 );
 
+const LinkIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+);
+
+const GalleryIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+);
+
+const UploadIcon = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+);
+
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
@@ -369,7 +381,7 @@ export default function Home() {
     return (
       <div className="auth-wrapper">
         <div className="container">
-          <div className="sidebar-brand" style={{ textAlign: 'center', marginBottom: '30px', padding: 0 }}>LinkSnap</div>
+          <div className="sidebar-brand" style={{ justifyContent: 'center', marginBottom: '24px' }}>LinkSnap</div>
           <div className="tab-buttons">
             <button
               className={`tab-button ${authTab === "login" ? "active" : ""}`}
@@ -459,7 +471,7 @@ export default function Home() {
         {loading && (
           <div className="loading">
             <div className="spinner"></div>
-            <p style={{ color: 'var(--text)', fontWeight: '500' }}>{loadingText}</p>
+            <p style={{ color: 'var(--ink-subtle)', fontSize: '13px' }}>{loadingText}</p>
           </div>
         )}
       </div>
@@ -481,13 +493,13 @@ export default function Home() {
             className={`nav-item ${mainTab === "create" ? "active" : ""}`}
             onClick={() => setMainTab("create")}
           >
-            <span>🔗</span> Shorten Link
+            <LinkIcon /> Shorten Link
           </button>
           <button
             className={`nav-item ${mainTab === "manage" ? "active" : ""}`}
             onClick={() => setMainTab("manage")}
           >
-            <span>📁</span> My Gallery
+            <GalleryIcon /> My Gallery
           </button>
         </nav>
 
@@ -496,7 +508,7 @@ export default function Home() {
             <div className="avatar">{currentUser!.username[0].toUpperCase()}</div>
             <div className="user-details">
               <span className="user-name">{currentUser!.username}</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{currentUser!.email}</span>
+              <span style={{ fontSize: '12px', color: 'var(--ink-tertiary)' }}>{currentUser!.email}</span>
             </div>
           </div>
           <button className="nav-item logout-btn" onClick={logout}>
@@ -511,7 +523,7 @@ export default function Home() {
             <div className="slide-up">
               <div className="content-header">
                 <h2>Create New Link</h2>
-                <p style={{ color: 'var(--text-muted)' }}>Shorten a URL or host a file in seconds.</p>
+                <p>Shorten a URL or host a file in seconds.</p>
               </div>
 
               <div className="create-mode-toggle">
@@ -573,7 +585,7 @@ export default function Home() {
                           }
                         }}
                       >
-                        <div className="icon">📁</div>
+                        <div className="upload-icon"><UploadIcon /></div>
                         <h3>Upload File</h3>
                         <p>{selectedFile ? `Selected: ${selectedFile.name}` : "Drop your files here or click to browse"}</p>
                         <input
@@ -601,9 +613,7 @@ export default function Home() {
                   {shortUrlResult && (
                     createMode === "file" ? (
                       <div className="result-card">
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>📦</span> Your File Link
-                        </h3>
+                        <h3>Your File Link</h3>
                         <div className="short-url">{shortUrlResult}</div>
                         <button type="button" className="button" style={{ marginTop: '12px' }} onClick={() => copyToClipboard(shortUrlResult)}>
                           <CopyIcon /> Copy Link
@@ -611,9 +621,7 @@ export default function Home() {
                       </div>
                     ) : (
                       <div className="result-card">
-                        <h3 style={{ fontSize: '1rem', color: 'var(--text)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>🔗</span> Your Short Link
-                        </h3>
+                        <h3>Your Short Link</h3>
                         <div className="short-url">{shortUrlResult}</div>
                         <button type="button" className="button" style={{ marginTop: '12px' }} onClick={() => copyToClipboard(shortUrlResult)}>
                           <CopyIcon /> Copy to Clipboard
@@ -638,16 +646,15 @@ export default function Home() {
                       }}
                     />
                     {customSlug.includes('-') && (
-                      <div className="slug-warning" style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span>⚠️</span> Your link will be <strong>{customSlug}</strong> instead
+                      <div className="slug-warning">
+                        Your link will be <strong>{customSlug}</strong>
                       </div>
                     )}
                   </div>
 
                   <div className="freshness-card slide-up">
                     <div className="freshness-header">
-                      <span className="icon">⏳</span>
-                      <h3>Expiration Settings</h3>
+                      <h3>Expiration</h3>
                     </div>
 
                     <div className="freshness-presets">
@@ -656,28 +663,28 @@ export default function Home() {
                         className={`preset-btn ${activePreset === "never" ? "active" : ""}`}
                         onClick={() => handlePresetClick("never")}
                       >
-                        <span>♾️</span> Never
+                        Never
                       </button>
                       <button
                         type="button"
                         className={`preset-btn ${activePreset === "1h" ? "active" : ""}`}
                         onClick={() => handlePresetClick("1h")}
                       >
-                        <span>⚡</span> 1H
+                        1H
                       </button>
                       <button
                         type="button"
                         className={`preset-btn ${activePreset === "1d" ? "active" : ""}`}
                         onClick={() => handlePresetClick("1d")}
                       >
-                        <span>☀️</span> 1D
+                        1D
                       </button>
                       <button
                         type="button"
                         className={`preset-btn ${activePreset === "1w" ? "active" : ""}`}
                         onClick={() => handlePresetClick("1w")}
                       >
-                        <span>📅</span> 1W
+                        1W
                       </button>
                     </div>
 
@@ -708,19 +715,18 @@ export default function Home() {
               <div className="content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h2>My Gallery</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Manage and track your shortened links.</p>
+                  <p>Manage and track your shortened links.</p>
                 </div>
-                <button className="button small" onClick={() => loadUserLinks(true)} disabled={loading}>
+                <button className="button secondary small" onClick={() => loadUserLinks(true)} disabled={loading}>
                   <RefreshIcon /> Refresh Links
                 </button>
               </div>
 
               <div className="links-table-container">
                 {userLinks.length === 0 ? (
-                  <div className="no-links" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📁</div>
-                    <h3>No links found yet</h3>
-                    <p>Go to the Create tab to get started!</p>
+                  <div className="no-links">
+                    <h3>No links yet</h3>
+                    <p>Create your first link to get started.</p>
                   </div>
                 ) : (
                   <table className="links-table">
@@ -746,29 +752,29 @@ export default function Home() {
                         return (
                           <tr key={link.shortCode} style={{ opacity: isExpired ? 0.5 : 1 }}>
                             <td>
-                              <a href={shortUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: "700", textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <a href={shortUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: "500", textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                                 {link.shortCode} <ExternalIcon />
                               </a>
                             </td>
                             <td className="url-cell">
                               <details>
                                 <summary>{link.originalUrl.length > 30 ? link.originalUrl.substring(0, 30) + "..." : link.originalUrl}</summary>
-                                <div style={{ padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: '12px', marginTop: '8px', fontSize: '0.9rem', wordBreak: 'break-all' }}>
+                                <div style={{ padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid var(--hairline)', borderRadius: '8px', marginTop: '8px', fontSize: '13px', wordBreak: 'break-all' }}>
                                   {link.originalUrl}
-                                  {link.driveId && <div style={{ color: 'var(--secondary)', marginTop: '8px', fontWeight: 'bold' }}>📍 Google Drive File</div>}
+                                  {link.driveId && <div style={{ color: 'var(--ink-subtle)', marginTop: '6px', fontSize: '12px' }}>Google Drive file</div>}
                                 </div>
                               </details>
                             </td>
                             <td style={{ fontSize: '0.9rem', color: isExpired ? 'var(--danger)' : 'inherit' }}>
                               {link.expiryDate ? new Date(link.expiryDate).toLocaleDateString() : 'Never'}
                             </td>
-                            <td style={{ textAlign: 'center', fontWeight: '700' }}>{link.clicks}</td>
+                            <td style={{ textAlign: 'center', fontWeight: '500', color: 'var(--ink-subtle)' }}>{link.clicks}</td>
                             <td>
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <button className="button icon-only" onClick={() => copyToClipboard(shortUrl)} title="Copy URL">
                                   <CopyIcon />
                                 </button>
-                                <button className="button icon-only" onClick={() => setActiveQrUrl(shortUrl)} title="View QR" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>
+                                <button className="button icon-only" onClick={() => setActiveQrUrl(shortUrl)} title="View QR">
                                   <QRIcon />
                                 </button>
                                 <button className="button icon-only danger" onClick={() => deleteLink(link.shortCode, link.driveId)} title="Delete Forever">
@@ -794,18 +800,18 @@ export default function Home() {
           className={`mobile-nav-item ${mainTab === "create" ? "active" : ""}`}
           onClick={() => setMainTab("create")}
         >
-          <span>🔗</span>
+          <LinkIcon />
           <span>Shorten</span>
         </button>
         <button
           className={`mobile-nav-item ${mainTab === "manage" ? "active" : ""}`}
           onClick={() => setMainTab("manage")}
         >
-          <span>📁</span>
+          <GalleryIcon />
           <span>Gallery</span>
         </button>
         <button className="mobile-nav-item" onClick={logout}>
-          <span>🚪</span>
+          <LogoutIcon />
           <span>Logout</span>
         </button>
       </nav>
@@ -813,20 +819,20 @@ export default function Home() {
       {/* QR Modal */}
       {activeQrUrl && (
         <div className="modal-overlay" onClick={() => setActiveQrUrl(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', color: '#000' }}>
-            <button className="modal-close" onClick={() => setActiveQrUrl(null)} style={{ color: '#000' }}>×</button>
-            <h3 style={{ marginBottom: '8px', color: '#000' }}>Quick Access QR</h3>
-            <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Anyone can scan this to reach your link.</p>
-            <div className="qr-container" style={{ background: '#f8fafc', padding: '30px', borderRadius: '24px', margin: '24px 0' }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setActiveQrUrl(null)}>×</button>
+            <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>QR Code</h3>
+            <p style={{ color: 'var(--ink-subtle)', fontSize: '13px' }}>Scan to open this link.</p>
+            <div className="qr-container">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(activeQrUrl)}`}
                 alt="QR Code"
                 style={{ width: '100%', height: 'auto' }}
               />
             </div>
-            <div className="short-url" style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>{activeQrUrl}</div>
-            <div className="modal-actions" style={{ marginTop: '24px' }}>
-              <button className="button" onClick={() => copyToClipboard(activeQrUrl)} style={{ background: '#0f172a' }}>
+            <div className="short-url">{activeQrUrl}</div>
+            <div className="modal-actions">
+              <button className="button" onClick={() => copyToClipboard(activeQrUrl)}>
                 <CopyIcon /> Copy Link
               </button>
             </div>
@@ -837,7 +843,7 @@ export default function Home() {
       {loading && (
         <div className="loading">
           <div className="spinner"></div>
-          <p style={{ color: 'var(--text)', fontWeight: '600', fontSize: '1.1rem' }}>{loadingText}</p>
+          <p style={{ color: 'var(--ink-subtle)', fontSize: '13px' }}>{loadingText}</p>
         </div>
       )}
 
@@ -845,9 +851,6 @@ export default function Home() {
       <div className="toast-container">
         {toasts.map((toast) => (
           <div key={toast.id} className={`toast ${toast.type}`}>
-            <span className="toast-icon">
-              {toast.type === "success" ? "✅" : "⚠️"}
-            </span>
             <span className="toast-message">{toast.message}</span>
             <button
               className="toast-close"
