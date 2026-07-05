@@ -3,15 +3,17 @@
 import { useState, useEffect, useRef, useCallback, FormEvent } from "react";
 import type QRCodeStylingType from "qr-code-styling";
 import ImageCropModal from "./ImageCropModal";
+import QRMiniPreview from "./QRMiniPreview";
 import { buildQROptions } from "@/utils/qrRender";
 import { renderQRToBlob } from "@/utils/qrRender";
 import {
   DEFAULT_QR_CONFIG,
   QRConfig,
   SavedQR,
-  driveImageUrl,
+  compressLogoDataUrl,
+  getLogoUrl,
 } from "@/utils/qrTypes";
-import { optimizedFetch, getGasEndpoint, getUploadEndpoint, fetchWithProgress, invalidateCache } from "@/utils/api";
+import { optimizedFetch, getGasEndpoint, invalidateCache } from "@/utils/api";
 
 interface QRGeneratorPanelProps {
   userId: string;
@@ -25,8 +27,10 @@ const DOT_STYLES: QRConfig["dotStyle"][] = [
 
 const CORNER_STYLES: QRConfig["cornerSquareStyle"][] = ["square", "dot", "extra-rounded"];
 
-function dataUrlToBase64(dataUrl: string): string {
-  return dataUrl.includes("base64,") ? dataUrl.split("base64,")[1] : dataUrl;
+function stripLogoFromConfig(config: QRConfig): QRConfig {
+  const next = { ...config };
+  delete next.logoBase64;
+  return next;
 }
 
 export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGeneratorPanelProps) {
@@ -53,7 +57,7 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
       const QRCodeStyling = (await import("qr-code-styling")).default;
       if (cancelled || !previewRef.current) return;
 
-      const logoUrl = logoDataUrl || (logoDriveId ? driveImageUrl(logoDriveId) : undefined);
+      const logoUrl = getLogoUrl(config, logoDriveId || undefined);
       const options = buildQROptions(qrContent, config, logoUrl);
 
       if (!qrInstanceRef.current) {
@@ -130,18 +134,15 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
     setQrName(qr.name);
     setQrContent(qr.content);
     setConfig(qr.config);
-    setLogoDataUrl(null);
-    setLogoDriveId(qr.logoDriveId || null);
+    if (qr.config.logoBase64) {
+      setLogoDataUrl(qr.config.logoBase64);
+      setLogoDriveId(null);
+    } else {
+      setLogoDataUrl(null);
+      setLogoDriveId(qr.logoDriveId || null);
+    }
     setQrSubTab("design");
     onNotify("success", `Loaded "${qr.name}"`);
-  };
-
-  const uploadBase64 = async (base64: string, filename: string, contentType: string) => {
-    const uploadEndpoint = getUploadEndpoint();
-    const url = `${uploadEndpoint}?action=upload&filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(contentType)}`;
-    const data = await fetchWithProgress(url, base64, () => {});
-    if (!data.success) throw new Error(data.error || "Upload failed");
-    return data.driveId as string;
   };
 
   const handleSave = async (e: FormEvent) => {
@@ -157,31 +158,12 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
 
     onLoading(true, "Saving QR code...");
     try {
-      let finalLogoDriveId = logoDriveId || "";
-      let imageDriveId = "";
-
-      if (logoDataUrl) {
-        onLoading(true, "Uploading logo...");
-        finalLogoDriveId = await uploadBase64(
-          dataUrlToBase64(logoDataUrl),
-          `qr-logo-${Date.now()}.png`,
-          "image/png"
-        );
+      const saveConfig: QRConfig = { ...config };
+      if (logoDataUrl?.startsWith("data:")) {
+        saveConfig.logoBase64 = await compressLogoDataUrl(logoDataUrl);
+      } else if (!logoDataUrl && !logoDriveId && !config.logoBase64) {
+        delete saveConfig.logoBase64;
       }
-
-      onLoading(true, "Rendering & uploading QR image...");
-      const logoUrl = logoDataUrl || (finalLogoDriveId ? driveImageUrl(finalLogoDriveId) : undefined);
-      const blob = await renderQRToBlob(qrContent, config, logoUrl);
-      const qrBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(dataUrlToBase64(result));
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      imageDriveId = await uploadBase64(qrBase64, `qr-${Date.now()}.png`, "image/png");
 
       const endpoint = getGasEndpoint();
       const body = new URLSearchParams();
@@ -189,10 +171,8 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
       body.append("userId", userId);
       body.append("name", qrName.trim());
       body.append("content", qrContent.trim());
-      body.append("config", JSON.stringify(config));
+      body.append("config", JSON.stringify(saveConfig));
       if (editingId) body.append("qrId", editingId);
-      if (finalLogoDriveId) body.append("logoDriveId", finalLogoDriveId);
-      if (imageDriveId) body.append("imageDriveId", imageDriveId);
 
       const data = await optimizedFetch(endpoint, { method: "POST", body: body.toString() });
       if (data.success) {
@@ -214,7 +194,7 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
   const handleDownload = async () => {
     if (!qrContent.trim()) return;
     try {
-      const logoUrl = logoDataUrl || (logoDriveId ? driveImageUrl(logoDriveId) : undefined);
+      const logoUrl = getLogoUrl(config, logoDriveId || undefined);
       const blob = await renderQRToBlob(qrContent, config, logoUrl);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -232,13 +212,6 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
     if (!confirm(`Delete "${qr.name}"?`)) return;
     onLoading(true, "Deleting...");
     try {
-      const driveIds = [qr.logoDriveId, qr.imageDriveId].filter(Boolean) as string[];
-      if (driveIds.length > 0) {
-        await optimizedFetch(getUploadEndpoint(), {
-          method: "POST",
-          body: `action=deleteFiles&driveIds=${JSON.stringify(driveIds)}`,
-        });
-      }
       const data = await optimizedFetch(getGasEndpoint(), {
         method: "POST",
         body: `action=deleteQR&qrId=${encodeURIComponent(qr.id)}&userId=${encodeURIComponent(userId)}`,
@@ -458,10 +431,10 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
             <div className="qr-logo-section">
               <label>Center Logo</label>
               <div className="qr-logo-upload">
-                {(logoDataUrl || logoDriveId) ? (
+                {(logoDataUrl || logoDriveId || config.logoBase64) ? (
                   <div className="qr-logo-preview">
                     <img
-                      src={logoDataUrl || driveImageUrl(logoDriveId!)}
+                      src={logoDataUrl || getLogoUrl(config, logoDriveId || undefined) || ""}
                       alt="Logo preview"
                     />
                     <button
@@ -470,6 +443,7 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
                       onClick={() => {
                         setLogoDataUrl(null);
                         setLogoDriveId(null);
+                        setConfig(stripLogoFromConfig(config));
                         if (logoInputRef.current) logoInputRef.current.value = "";
                       }}
                     >
@@ -495,7 +469,7 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
                 )}
               </div>
 
-              {(logoDataUrl || logoDriveId) && (
+              {(logoDataUrl || logoDriveId || config.logoBase64) && (
                 <>
                   <div className="form-group">
                     <label htmlFor="logoSize">Logo Size ({Math.round(config.logoSize * 100)}%)</label>
@@ -549,11 +523,12 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
               {savedQRs.map((qr) => (
                 <div key={qr.id} className="qr-saved-card">
                   <div className="qr-saved-thumb">
-                    {qr.imageDriveId ? (
-                      <img src={driveImageUrl(qr.imageDriveId)} alt={qr.name} />
-                    ) : (
-                      <div className="qr-saved-placeholder">QR</div>
-                    )}
+                    <QRMiniPreview
+                      content={qr.content}
+                      config={qr.config}
+                      logoDriveId={qr.logoDriveId}
+                      size={100}
+                    />
                   </div>
                   <div className="qr-saved-info">
                     <h4>{qr.name}</h4>
@@ -568,16 +543,22 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
                     <button type="button" className="button secondary small" onClick={() => loadSavedIntoEditor(qr)}>
                       Edit
                     </button>
-                    {qr.imageDriveId && (
-                      <a
-                        className="button secondary small"
-                        href={driveImageUrl(qr.imageDriveId)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View
-                      </a>
-                    )}
+                    <button
+                      type="button"
+                      className="button secondary small"
+                      onClick={async () => {
+                        const logoUrl = getLogoUrl(qr.config, qr.logoDriveId);
+                        const blob = await renderQRToBlob(qr.content, qr.config, logoUrl);
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `${qr.name}.png`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      Download
+                    </button>
                     <button type="button" className="button icon-only danger small" onClick={() => handleDelete(qr)} title="Delete">
                       ×
                     </button>

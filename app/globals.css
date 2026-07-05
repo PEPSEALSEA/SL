@@ -1254,6 +1254,11 @@ input:hover:not(:focus) {
   max-height: 100px;
 }
 
+.qr-mini-preview canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .qr-saved-placeholder {
   font-size: 24px;
   color: var(--ink-tertiary);

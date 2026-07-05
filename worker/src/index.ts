@@ -196,7 +196,9 @@ async function uploadToDrive(
   body.set(binary, prefix.length);
   body.set(suffix, prefix.length + binary.length);
 
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+  const res = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink',
+    {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -212,7 +214,7 @@ async function uploadToDrive(
 
   const file = (await res.json()) as { id: string; webViewLink?: string };
 
-  await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}/permissions`, {
+  await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}/permissions?supportsAllDrives=true`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: 'reader', type: 'anyone' }),
@@ -234,7 +236,7 @@ async function trashDriveFiles(env: Bindings, driveIds: string[]) {
 
   for (const id of driveIds) {
     try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?supportsAllDrives=true`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ trashed: true }),

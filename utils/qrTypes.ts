@@ -20,6 +20,7 @@ export interface QRConfig {
   logoMargin: number;
   logoRound: boolean;
   hideBackgroundDots: boolean;
+  logoBase64?: string;
 }
 
 export interface SavedQR {
@@ -62,4 +63,31 @@ export const DEFAULT_QR_CONFIG: QRConfig = {
 
 export function driveImageUrl(driveId: string): string {
   return `https://drive.google.com/thumbnail?id=${driveId}&sz=w400`;
+}
+
+export function getLogoUrl(config: QRConfig, logoDriveId?: string): string | undefined {
+  if (config.logoBase64) return config.logoBase64;
+  if (logoDriveId) return driveImageUrl(logoDriveId);
+  return undefined;
+}
+
+export async function compressLogoDataUrl(dataUrl: string, maxSize = 200): Promise<string> {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+
+  const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+  const width = Math.round(image.width * scale);
+  const height = Math.round(image.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL("image/png", 0.85);
 }
