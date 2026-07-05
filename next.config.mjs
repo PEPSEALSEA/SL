@@ -1,13 +1,15 @@
 /** @type {import('next').NextConfig} */
-const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'SL';
-const basePath = `/${repoName}`;
+const repo = process.env.GITHUB_REPOSITORY || '';
+const repoName = repo.includes('/') ? repo.split('/')[1] : 'SL';
+const basePath = '/' + repoName;
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
     output: 'export',
     images: {
         unoptimized: true,
     },
-    basePath,
+    basePath: basePath,
     assetPrefix: basePath,
     trailingSlash: true,
     env: {
