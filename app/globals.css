@@ -962,3 +962,114 @@ input:hover:not(:focus) {
     display: none;
   }
 }
+
+/* Redirect / file landing page */
+.redirect-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(94, 105, 209, 0.08) 0%, transparent 55%),
+    var(--canvas);
+}
+
+.redirect-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  text-align: center;
+}
+
+.redirect-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-subtle);
+  letter-spacing: -0.02em;
+}
+
+.redirect-brand::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-xs);
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.redirect-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--primary);
+}
+
+.redirect-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.redirect-desc {
+  font-size: 14px;
+  color: var(--ink-subtle);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.redirect-code {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+}
+
+.redirect-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.redirect-actions .button {
+  text-decoration: none;
+}
+
+.redirect-hint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--ink-tertiary);
+}
+
+.redirect-error-msg {
+  color: var(--danger);
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .redirect-card {
+    padding: 24px 20px;
+  }
+}

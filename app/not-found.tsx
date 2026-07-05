@@ -1,196 +1,173 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getGasEndpoint } from "@/utils/api";
+import { getApiEndpoint } from "@/utils/api";
 import { basePath, withBasePath } from "@/utils/paths";
 
+const FileIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="12" y1="18" x2="12" y2="12" />
+    <line x1="9" y1="15" x2="15" y2="15" />
+  </svg>
+);
+
+const ViewIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const DownloadIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+const LinkBrokenIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    <line x1="2" y1="2" x2="22" y2="22" />
+  </svg>
+);
+
+const ClockIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
 export default function NotFound() {
-    const [error, setError] = useState("");
-    const [isExpired, setIsExpired] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [code, setCode] = useState("");
-    const [fileData, setFileData] = useState<{ url: string, driveId: string } | null>(null);
+  const [error, setError] = useState("");
+  const [isExpired, setIsExpired] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [code, setCode] = useState("");
+  const [fileData, setFileData] = useState<{ url: string; driveId: string } | null>(null);
 
-    useEffect(() => {
-        const gasEndpoint = getGasEndpoint();
-        const path = window.location.pathname;
-        const segments = path.split('/').filter(Boolean);
+  useEffect(() => {
+    const apiEndpoint = getApiEndpoint();
+    const path = window.location.pathname;
+    const segments = path.split("/").filter(Boolean);
 
-        let shortCode = segments[segments.length - 1];
-        const repoSegment = basePath.replace(/^\//, '');
-        if (shortCode === repoSegment || shortCode === 'Shorten-URLs') shortCode = '';
-        setCode(shortCode);
+    let shortCode = segments[segments.length - 1];
+    const repoSegment = basePath.replace(/^\//, "");
+    if (shortCode === repoSegment || shortCode === "Shorten-URLs") shortCode = "";
+    setCode(shortCode);
 
-        if (!shortCode || shortCode === '404' || shortCode === 'index') {
-            setLoading(false);
-            setError("No short code provided");
-            return;
-        }
+    if (!shortCode || shortCode === "404" || shortCode === "index") {
+      setLoading(false);
+      setError("No short code provided");
+      return;
+    }
 
-        async function handleRedirect() {
-            try {
-                const response = await fetch(
-                    `${gasEndpoint}?action=get&shortCode=${encodeURIComponent(shortCode)}`
-                );
-                const data = await response.json();
+    async function handleRedirect() {
+      try {
+        const response = await fetch(
+          `${apiEndpoint}?action=get&shortCode=${encodeURIComponent(shortCode)}`
+        );
+        const data = await response.json();
 
-                if (data.success && data.originalUrl) {
-                    if (data.expiryDate) {
-                        const expiry = new Date(data.expiryDate);
-                        if (expiry < new Date()) {
-                            setIsExpired(true);
-                            setError("This link has expired");
-                            setLoading(false);
-                            return;
-                        }
-                    }
-
-                    // If it's a Drive file, we show a landing page instead of instant redirect
-                    if (data.driveId) {
-                        setFileData({
-                            // Always use the official Drive viewer for files to see all pages
-                            url: `https://drive.google.com/file/d/${data.driveId}/view`,
-                            driveId: data.driveId
-                        });
-                        setLoading(false);
-                    } else {
-                        window.location.replace(data.originalUrl);
-                    }
-                } else {
-                    setError(data.error || "Short link not found");
-                    setLoading(false);
-                }
-            } catch (err: unknown) {
-                console.error("Redirection error:", err);
-                setError("Could not retrieve the original URL");
-                setLoading(false);
+        if (data.success && data.originalUrl) {
+          if (data.expiryDate) {
+            const expiry = new Date(data.expiryDate);
+            if (expiry < new Date()) {
+              setIsExpired(true);
+              setError("This link has expired");
+              setLoading(false);
+              return;
             }
+          }
+
+          if (data.driveId) {
+            setFileData({
+              url: `https://drive.google.com/file/d/${data.driveId}/view`,
+              driveId: data.driveId,
+            });
+            setLoading(false);
+          } else {
+            window.location.replace(data.originalUrl);
+          }
+        } else {
+          setError(data.error || "Short link not found");
+          setLoading(false);
         }
+      } catch (err: unknown) {
+        console.error("Redirection error:", err);
+        setError("Could not retrieve the original URL");
+        setLoading(false);
+      }
+    }
 
-        handleRedirect();
-    }, []);
+    handleRedirect();
+  }, []);
 
-    return (
-        <div className="not-found-wrapper">
-            <div className="container">
-                {loading ? (
-                    <div className="loading-state fade-in">
-                        <div className="spinner"></div>
-                        <h2>Redirecting...</h2>
-                        <p>Redirecting to &quot;{code || 'link'}&quot;</p>
-                    </div>
-                ) : fileData ? (
-                    <div className="file-box slide-up">
-                        <div className="file-icon">🍱</div>
-                        <h1>File Ready!</h1>
-                        <p className="description">This link points to a private file. How would you like to open it?</p>
+  return (
+    <div className="redirect-page">
+      <div className="redirect-card slide-up">
+        <div className="redirect-brand">LinkSnap</div>
 
-                        <div className="file-actions">
-                            <a href={fileData.url} target="_blank" rel="noopener noreferrer" className="button view-button">
-                                👁️ View Full File
-                            </a>
-                            <a href={`https://drive.google.com/uc?export=download&id=${fileData.driveId}`} className="button download-button">
-                                📥 Download Directly
-                            </a>
-                        </div>
-
-                        <p style={{ marginTop: '20px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            Direct view is better for multi-page PDFs.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="error-state slide-up">
-                        <div className="error-icon">{isExpired ? "⌛" : "🛰️"}</div>
-                        <h1>{isExpired ? "Link Expired" : "Lost in Space"}</h1>
-                        <p className="error-message">{error}</p>
-                        <p className="description">The link you&apos;re looking for might have been deleted, expired, or never existed in this timeline.</p>
-                        <a href={withBasePath('/')} className="button">
-                            Take Me Home
-                        </a>
-                    </div>
-                )}
+        {loading ? (
+          <div className="fade-in">
+            <div className="spinner" style={{ margin: "0 auto 16px" }} />
+            <h2 className="redirect-title">Redirecting</h2>
+            <p className="redirect-desc">
+              Taking you to your destination
+              {code && <span className="redirect-code">{code}</span>}
+            </p>
+          </div>
+        ) : fileData ? (
+          <>
+            <div className="redirect-icon">
+              <FileIcon />
             </div>
-            <style jsx>{`
-                .not-found-wrapper {
-                    display: flex;
-                    height: 100vh;
-                    width: 100vw;
-                    align-items: center;
-                    justify-content: center;
-                    background: #020617;
-                    background-image: 
-                        radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 70%),
-                        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%);
-                }
-                .container {
-                    text-align: center;
-                    max-width: 450px;
-                }
-                .error-icon {
-                    font-size: 4rem;
-                    margin-bottom: 1.5rem;
-                }
-                h1 {
-                    margin-bottom: 1rem;
-                }
-                h2 {
-                    color: var(--text);
-                    margin-bottom: 0.5rem;
-                }
-                .error-message {
-                    color: var(--secondary);
-                    font-weight: 600;
-                    font-size: 1.1rem;
-                    margin-bottom: 1rem;
-                }
-                .description {
-                    color: var(--text-muted);
-                    margin-bottom: 2rem;
-                    font-size: 0.95rem;
-                }
-                .spinner {
-                    width: 50px;
-                    height: 50px;
-                    border: 3px solid rgba(99, 102, 241, 0.2);
-                    border-top: 3px solid #6366f1;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                    margin: 0 auto 2rem;
-                }
-                @keyframes spin { to { transform: rotate(360deg); } }
-                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-                .fade-in { animation: fadeIn 0.5s ease; }
-                .slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-
-                .file-box {
-                    background: #fff;
-                    color: #1e293b;
-                    padding: 40px;
-                    border-radius: 20px;
-                    border-top: 5px solid #ef4444;
-                    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-                }
-                .file-icon {
-                    font-size: 4rem;
-                    margin-bottom: 1rem;
-                }
-                .file-actions {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 12px;
-                    margin-top: 20px;
-                }
-                .view-button {
-                    background: #1e293b !important;
-                    color: white !important;
-                }
-                .download-button {
-                    background: #ef4444 !important;
-                    color: white !important;
-                }
-                .file-box h1 { color: #1e293b; }
-            `}</style>
-        </div>
-    );
+            <h1 className="redirect-title">File ready</h1>
+            <p className="redirect-desc">
+              This link points to a shared file. Choose how you&apos;d like to open it.
+            </p>
+            <div className="redirect-actions">
+              <a
+                href={fileData.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="button"
+              >
+                <ViewIcon />
+                View full file
+              </a>
+              <a
+                href={`https://drive.google.com/uc?export=download&id=${fileData.driveId}`}
+                className="button secondary"
+              >
+                <DownloadIcon />
+                Download directly
+              </a>
+            </div>
+            <p className="redirect-hint">Direct view works best for multi-page PDFs.</p>
+          </>
+        ) : (
+          <>
+            <div className="redirect-icon">
+              {isExpired ? <ClockIcon /> : <LinkBrokenIcon />}
+            </div>
+            <h1 className="redirect-title">{isExpired ? "Link expired" : "Link not found"}</h1>
+            <p className="redirect-error-msg">{error}</p>
+            <p className="redirect-desc">
+              {isExpired
+                ? "This short link has passed its expiry date and is no longer available."
+                : "The link may have been deleted or never existed."}
+            </p>
+            <a href={withBasePath("/")} className="button">
+              Back to LinkSnap
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
