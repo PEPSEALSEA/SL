@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent, useRef } from "react";
+import dynamic from "next/dynamic";
 import { optimizedFetch, getGasEndpoint, getUploadEndpoint, invalidateCache } from "@/utils/api";
 import { buildShortUrl, getShortUrls } from "@/utils/paths";
+
+const QRGeneratorPanel = dynamic(() => import("@/components/QRGeneratorPanel"), { ssr: false });
 
 interface User {
   id: string;
@@ -122,7 +125,7 @@ function ShortUrlCopies({
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
-  const [mainTab, setMainTab] = useState<"create" | "manage">("create");
+  const [mainTab, setMainTab] = useState<"create" | "manage" | "qr">("create");
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
   const [error, setError] = useState("");
@@ -565,6 +568,12 @@ export default function Home() {
           >
             <GalleryIcon /> My Gallery
           </button>
+          <button
+            className={`nav-item ${mainTab === "qr" ? "active" : ""}`}
+            onClick={() => setMainTab("qr")}
+          >
+            <QRIcon /> QR Generator
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -786,7 +795,7 @@ export default function Home() {
                 </div>
               </form>
             </div>
-          ) : (
+          ) : mainTab === "manage" ? (
             <div className="slide-up">
               <div className="content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -865,6 +874,12 @@ export default function Home() {
                 )}
               </div>
             </div>
+          ) : (
+            <QRGeneratorPanel
+              userId={currentUser!.id}
+              onNotify={addToast}
+              onLoading={(show, text) => showLoading(show, text)}
+            />
           )}
         </div>
       </main>
@@ -884,6 +899,13 @@ export default function Home() {
         >
           <GalleryIcon />
           <span>Gallery</span>
+        </button>
+        <button
+          className={`mobile-nav-item ${mainTab === "qr" ? "active" : ""}`}
+          onClick={() => setMainTab("qr")}
+        >
+          <QRIcon />
+          <span>QR</span>
         </button>
         <button className="mobile-nav-item" onClick={logout}>
           <LogoutIcon />
