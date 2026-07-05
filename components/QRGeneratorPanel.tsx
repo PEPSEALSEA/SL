@@ -158,23 +158,33 @@ export default function QRGeneratorPanel({ userId, onNotify, onLoading }: QRGene
 
     onLoading(true, "Saving QR code...");
     try {
-      const saveConfig: QRConfig = { ...config };
+      const saveConfig = stripLogoFromConfig(config);
+      let logoData = "";
       if (logoDataUrl?.startsWith("data:")) {
-        saveConfig.logoBase64 = await compressLogoDataUrl(logoDataUrl);
-      } else if (!logoDataUrl && !logoDriveId && !config.logoBase64) {
-        delete saveConfig.logoBase64;
+        logoData = await compressLogoDataUrl(logoDataUrl);
+        if (logoData.length > 48000) {
+          throw new Error("Logo image is too large. Try a smaller image or crop tighter.");
+        }
+      } else if (config.logoBase64) {
+        logoData = config.logoBase64;
       }
 
       const endpoint = getGasEndpoint();
-      const body = new URLSearchParams();
-      body.append("action", "saveQR");
-      body.append("userId", userId);
-      body.append("name", qrName.trim());
-      body.append("content", qrContent.trim());
-      body.append("config", JSON.stringify(saveConfig));
-      if (editingId) body.append("qrId", editingId);
+      const payload: Record<string, string> = {
+        action: "saveQR",
+        userId,
+        name: qrName.trim(),
+        content: qrContent.trim(),
+        config: JSON.stringify(saveConfig),
+        logoData,
+      };
+      if (editingId) payload.qrId = editingId;
 
-      const data = await optimizedFetch(endpoint, { method: "POST", body: body.toString() });
+      const data = await optimizedFetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (data.success) {
         invalidateCache(`userQRs_${userId}`);
         onNotify("success", editingId ? "QR code updated!" : "QR code saved!");

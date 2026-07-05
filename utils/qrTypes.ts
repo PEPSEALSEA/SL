@@ -71,7 +71,7 @@ export function getLogoUrl(config: QRConfig, logoDriveId?: string): string | und
   return undefined;
 }
 
-export async function compressLogoDataUrl(dataUrl: string, maxSize = 200): Promise<string> {
+export async function compressLogoDataUrl(dataUrl: string, maxSize = 128): Promise<string> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
@@ -80,8 +80,8 @@ export async function compressLogoDataUrl(dataUrl: string, maxSize = 200): Promi
   });
 
   const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-  const width = Math.round(image.width * scale);
-  const height = Math.round(image.height * scale);
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -89,5 +89,12 @@ export async function compressLogoDataUrl(dataUrl: string, maxSize = 200): Promi
   const ctx = canvas.getContext("2d");
   if (!ctx) return dataUrl;
   ctx.drawImage(image, 0, 0, width, height);
-  return canvas.toDataURL("image/png", 0.85);
+
+  let quality = 0.82;
+  let result = canvas.toDataURL("image/jpeg", quality);
+  while (result.length > 48000 && quality > 0.4) {
+    quality -= 0.08;
+    result = canvas.toDataURL("image/jpeg", quality);
+  }
+  return result;
 }

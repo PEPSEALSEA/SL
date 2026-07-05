@@ -37,7 +37,9 @@ const QRS_SHEET = 'QRCodes';
 
 const USERS_HEADERS = ['User ID', 'Email', 'Username', 'Real Password', 'Password Hash', 'Created At (UTC)'];
 const URLS_HEADERS = ['Short Code', 'Original URL', 'User ID', 'Created At (UTC)', 'Click Count', 'Expiry Date', 'Drive ID'];
-const QRS_HEADERS = ['QR ID', 'User ID', 'Name', 'Content', 'Config JSON', 'Logo Drive ID', 'Image Drive ID', 'Created At (UTC)'];
+const QRS_HEADERS = ['QR ID', 'User ID', 'Name', 'Content', 'Config JSON', 'Logo Data', 'Image Drive ID', 'Created At (UTC)'];
+
+const SHEETS_MAX_CELL_CHARS = 50000;
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -540,78 +542,119 @@ async function handleDeleteFiles(env: Bindings, params: Record<string, string>) 
   return ok(`Successfully processed ${count} files`, { count, errors });
 }
 
+function isLogoBase64(value: string): boolean {
+  if (!value) return false;
+  if (value.startsWith('data:image')) return true;
+  if (value.startsWith('iVBOR') || value.startsWith('/9j/')) return true;
+  return value.length > 80;
+}
+
+function normalizeLogoData(value: string): string {
+  if (!value) return '';
+  if (value.startsWith('data:')) return value;
+  if (isLogoBase64(value)) return `data:image/png;base64,${value}`;
+  return '';
+}
+
 async function handleSaveQR(env: Bindings, params: Record<string, string>) {
-  const userId = params.userId;
-  const name = params.name?.trim();
-  const content = params.content?.trim();
-  const configJson = params.config;
-  const logoDriveId = params.logoDriveId || '';
-  const imageDriveId = params.imageDriveId || '';
-  const existingId = params.qrId?.trim();
-
-  if (!userId) return fail('User not authenticated');
-  if (!name) return fail('QR name is required');
-  if (!content) return fail('QR content is required');
-  if (!configJson) return fail('QR config is required');
-
   try {
-    JSON.parse(configJson);
-  } catch {
-    return fail('Invalid config JSON');
-  }
+    const userId = params.userId;
+    const name = params.name?.trim();
+    const content = params.content?.trim();
+    const rawConfig = params.config;
+    const logoData = params.logoData?.trim() || '';
+    const imageDriveId = params.imageDriveId || '';
+    const existingId = params.qrId?.trim();
 
-  const qrs = await getSheetValues(env, `${QRS_SHEET}!A:H`);
+    if (!userId) return fail('User not authenticated');
+    if (!name) return fail('QR name is required');
+    if (!content) return fail('QR content is required');
+    if (!rawConfig) return fail('QR config is required');
 
-  if (existingId) {
-    for (let i = 1; i < qrs.length; i++) {
-      if (qrs[i][0] === existingId && qrs[i][1] === userId) {
-        await updateSheetRow(env, `${QRS_SHEET}!A${i + 1}:H${i + 1}`, [
-          existingId, userId, name, content, configJson,
-          logoDriveId, imageDriveId, qrs[i][7] || new Date().toISOString(),
-        ]);
-        return ok('QR code updated successfully', { qrId: existingId });
-      }
+    let configJson: string;
+    try {
+      const parsed = JSON.parse(rawConfig) as Record<string, unknown>;
+      delete parsed.logoBase64;
+      configJson = JSON.stringify(parsed);
+    } catch {
+      return fail('Invalid config JSON');
     }
-    return fail('QR code not found or you do not have permission to edit it');
+
+    if (configJson.length > SHEETS_MAX_CELL_CHARS) {
+      return fail('QR config is too large to save');
+    }
+    if (logoData.length > SHEETS_MAX_CELL_CHARS) {
+      return fail('Logo image is too large. Try a smaller image or crop tighter.');
+    }
+
+    const qrs = await getSheetValues(env, `${QRS_SHEET}!A:H`);
+
+    if (existingId) {
+      for (let i = 1; i < qrs.length; i++) {
+        if (qrs[i][0] === existingId && qrs[i][1] === userId) {
+          await updateSheetRow(env, `${QRS_SHEET}!A${i + 1}:H${i + 1}`, [
+            existingId, userId, name, content, configJson,
+            logoData, imageDriveId, qrs[i][7] || new Date().toISOString(),
+          ]);
+          return ok('QR code updated successfully', { qrId: existingId });
+        }
+      }
+      return fail('QR code not found or you do not have permission to edit it');
+    }
+
+    const qrId = generateUUID();
+    await appendSheetRow(env, QRS_SHEET, [
+      qrId, userId, name, content, configJson,
+      logoData, imageDriveId, new Date().toISOString(),
+    ]);
+
+    return ok('QR code saved successfully', { qrId });
+  } catch (err) {
+    console.error('saveQR error:', err);
+    return fail(err instanceof Error ? err.message : 'Failed to save QR code', 500);
   }
-
-  const qrId = generateUUID();
-  await appendSheetRow(env, QRS_SHEET, [
-    qrId, userId, name, content, configJson,
-    logoDriveId, imageDriveId, new Date().toISOString(),
-  ]);
-
-  return ok('QR code saved successfully', { qrId });
 }
 
 async function handleGetUserQRs(env: Bindings, userId: string) {
   if (!userId) return fail('User not authenticated');
 
-  const qrs = await getSheetValues(env, `${QRS_SHEET}!A:H`);
-  const userQRs: Record<string, unknown>[] = [];
+  try {
+    const qrs = await getSheetValues(env, `${QRS_SHEET}!A:H`);
+    const userQRs: Record<string, unknown>[] = [];
 
-  for (let i = 1; i < qrs.length; i++) {
-    if (qrs[i][1] === userId) {
-      let config = {};
-      try {
-        config = JSON.parse(qrs[i][4] || '{}');
-      } catch {
-        config = {};
+    for (let i = 1; i < qrs.length; i++) {
+      if (qrs[i][1] === userId) {
+        let config: Record<string, unknown> = {};
+        try {
+          config = JSON.parse(qrs[i][4] || '{}') as Record<string, unknown>;
+        } catch {
+          config = {};
+        }
+
+        const logoCol = qrs[i][5] || '';
+        const logoBase64 = normalizeLogoData(logoCol);
+        if (logoBase64) {
+          config.logoBase64 = logoBase64;
+        }
+
+        userQRs.push({
+          id: qrs[i][0],
+          name: qrs[i][2],
+          content: qrs[i][3],
+          config,
+          logoDriveId: logoBase64 ? '' : logoCol,
+          imageDriveId: qrs[i][6] || '',
+          created: normalizeCreatedDate(qrs[i][7]),
+        });
       }
-      userQRs.push({
-        id: qrs[i][0],
-        name: qrs[i][2],
-        content: qrs[i][3],
-        config,
-        logoDriveId: qrs[i][5] || '',
-        imageDriveId: qrs[i][6] || '',
-        created: normalizeCreatedDate(qrs[i][7]),
-      });
     }
-  }
 
-  userQRs.sort((a, b) => parseCreatedTimestamp(String(b.created)) - parseCreatedTimestamp(String(a.created)));
-  return ok('QR codes retrieved successfully', { qrs: userQRs });
+    userQRs.sort((a, b) => parseCreatedTimestamp(String(b.created)) - parseCreatedTimestamp(String(a.created)));
+    return ok('QR codes retrieved successfully', { qrs: userQRs });
+  } catch (err) {
+    console.error('getUserQRs error:', err);
+    return fail(err instanceof Error ? err.message : 'Failed to load QR codes', 500);
+  }
 }
 
 async function handleDeleteQR(env: Bindings, params: Record<string, string>) {
