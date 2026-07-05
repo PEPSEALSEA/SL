@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getGasEndpoint } from "@/utils/api";
+import { basePath, withBasePath } from "@/utils/paths";
 
 export default function NotFound() {
     const [error, setError] = useState("");
@@ -16,7 +17,8 @@ export default function NotFound() {
         const segments = path.split('/').filter(Boolean);
 
         let shortCode = segments[segments.length - 1];
-        if (shortCode === 'Shorten-URLs') shortCode = '';
+        const repoSegment = basePath.replace(/^\//, '');
+        if (shortCode === repoSegment || shortCode === 'Shorten-URLs') shortCode = '';
         setCode(shortCode);
 
         if (!shortCode || shortCode === '404' || shortCode === 'index') {
@@ -102,7 +104,7 @@ export default function NotFound() {
                         <h1>{isExpired ? "Link Expired" : "Lost in Space"}</h1>
                         <p className="error-message">{error}</p>
                         <p className="description">The link you&apos;re looking for might have been deleted, expired, or never existed in this timeline.</p>
-                        <a href="/Shorten-URLs/" className="button">
+                        <a href={withBasePath('/')} className="button">
                             Take Me Home
                         </a>
                     </div>

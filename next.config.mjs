@@ -1,13 +1,18 @@
 /** @type {import('next').NextConfig} */
+const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'SL';
+const basePath = `/${repoName}`;
+
 const nextConfig = {
     output: 'export',
     images: {
         unoptimized: true,
     },
-    // Set the base path to match your GitHub Pages repository name
-    basePath: '/Shorten-URLs',
-    assetPrefix: '/Shorten-URLs',
+    basePath,
+    assetPrefix: basePath,
     trailingSlash: true,
+    env: {
+        NEXT_PUBLIC_BASE_PATH: basePath,
+    },
 };
 
 export default nextConfig;

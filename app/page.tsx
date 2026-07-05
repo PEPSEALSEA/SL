@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, FormEvent, useRef } from "react";
 import { optimizedFetch, getGasEndpoint, getUploadEndpoint, invalidateCache } from "@/utils/api";
+import { buildShortUrl } from "@/utils/paths";
 
 interface User {
   id: string;
@@ -301,11 +302,7 @@ export default function Home() {
       });
 
       if (data.success) {
-        const baseUrl = window.location.origin;
-        const hasSubpath = window.location.pathname.includes('/Shorten-URLs');
-        const shortUrl = hasSubpath
-          ? `${baseUrl}/Shorten-URLs/${data.shortCode}`
-          : `${baseUrl}/${data.shortCode}`;
+        const shortUrl = buildShortUrl(window.location.origin, data.shortCode);
 
         setShortUrlResult(shortUrl);
         setOriginalUrl("");
@@ -741,11 +738,7 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {userLinks.map((link) => {
-                        const baseUrl = window.location.origin;
-                        const hasSubpath = window.location.pathname.includes('/Shorten-URLs');
-                        const shortUrl = hasSubpath
-                          ? `${baseUrl}/Shorten-URLs/${link.shortCode}`
-                          : `${baseUrl}/${link.shortCode}`;
+                        const shortUrl = buildShortUrl(window.location.origin, link.shortCode);
 
                         const isExpired = link.expiryDate && new Date(link.expiryDate) < new Date();
 
