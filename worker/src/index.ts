@@ -130,6 +130,26 @@ async function getSheetId(env: Bindings, sheetName: string): Promise<number> {
   return sheet.properties.sheetId;
 }
 
+async function ensureSheetExists(env: Bindings, sheetName: string) {
+  try {
+    await getSheetId(env, sheetName);
+  } catch {
+    const token = await getAuthToken(env);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.SPREADSHEET_ID}:batchUpdate`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{ addSheet: { properties: { title: sheetName } } }],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Sheets addSheet error: ${res.status} ${err}`);
+    }
+  }
+}
+
 async function deleteSheetRow(env: Bindings, sheetName: string, rowIndex: number) {
   const sheetId = await getSheetId(env, sheetName);
   const token = await getAuthToken(env);
@@ -611,6 +631,8 @@ async function handleDeleteQR(env: Bindings, params: Record<string, string>) {
 async function handleSetup(env: Bindings) {
   const users = await getSheetValues(env, `${USERS_SHEET}!A:F`);
   const urls = await getSheetValues(env, `${URLS_SHEET}!A:G`);
+
+  await ensureSheetExists(env, QRS_SHEET);
   const qrs = await getSheetValues(env, `${QRS_SHEET}!A:H`);
 
   if (users.length === 0) {
