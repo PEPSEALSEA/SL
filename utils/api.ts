@@ -1,6 +1,4 @@
-
-const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzfXA8wKylXKUYh4Urke_Dd1xgBo_Sng9ywmjfK9HQ4Bo8tqDQREZUZ9sz_rrRGCpMz/exec";
-const UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycbxWHUje0tk1zVd37HyhpfOlEuUhzPQxwChdtECtgKtBInpSu142TfoMjGWtVE_74iqm/exec";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://sl-worker.sealseapep.workers.dev";
 
 // Cache for API responses
 const apiCache = new Map<string, { data: any, timestamp: number }>();
@@ -79,12 +77,16 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries
     }
 }
 
+export function getApiEndpoint() {
+    return API_URL;
+}
+
 export function getGasEndpoint() {
-    return GAS_ENDPOINT;
+    return API_URL;
 }
 
 export function getUploadEndpoint() {
-    return UPLOAD_ENDPOINT;
+    return API_URL;
 }
 
 export async function fetchWithProgress(urlBase: string, base64Data: string, onProgress: ProgressCallback): Promise<any> {

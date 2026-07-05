@@ -1,0 +1,11 @@
+name = "sl-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+SPREADSHEET_ID = "1Wxx3TgN2lfJy7lllmPsMEyQ-5b8NsWAWG8_RakYXz54"
+GOOGLE_DRIVE_FOLDER_ID = "1xVX82FFBuH1rp4VwnM2jYdmrRhBu01uw"
+
+# Secrets: wrangler secret put GOOGLE_CLIENT_EMAIL
+#           wrangler secret put GOOGLE_PRIVATE_KEY
